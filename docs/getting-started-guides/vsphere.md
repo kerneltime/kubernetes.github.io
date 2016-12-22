@@ -2,22 +2,70 @@
 assignees:
 - erictune
 - jbeda
-
 ---
 
-The example below creates a Kubernetes cluster with 4 worker node Virtual
-Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This
-cluster is set up and controlled from your workstation (or wherever you find
-convenient).
+This page covers how to get started on deploying kubernetes on vSphere and details for how to configure the vsphere cloud provider.
 
 * TOC
 {:toc}
 
-### Prerequisites
+### Getting started with vSphere
 
-1. You need administrator credentials to an ESXi machine or vCenter instance with write mode api access enabled (not available on the free ESXi license).
-2. You must have Go (see [here](https://github.com/kubernetes/kubernetes/tree/{{page.githubbranch}}/docs/devel/development.md#go-versions) for supported versions) installed: [www.golang.org](http://www.golang.org).
-3. You must have your `GOPATH` set up and include `$GOPATH/bin` in your `PATH`.
+Kubernetes comes with a cloud provider for vSphere. A quick and easy way to try out the cloud provider is to deploy kubernetes using [Kubernetes-anywhere](https://github.com/kubernetes/kubernetes-anywhere). This page also describes how to configure and get started with the cloud provider if deploying using custom install scripts and references documentation for consuming vSphere cloud provider features.
+
+### Kubernetes Anywhere
+
+Detailed steps can be found at the [getting started with kubernetes-anywhere on vSphere page](https://github.com/kubernetes/kubernetes-anywhere/blob/master/phase1/vsphere/README.md)
+
+### vSphere Cloud Provider
+
+vSphere Cloud Provider allows consumption of vSphere managed storage within kubernetes. It supports:
+
+1. Volumes 
+2. Persistent Volumes
+3. Storage Classes and provisioning of volumes.
+
+Examples for how to use can be found at [Kubernetes examples page](https://github.com/kubernetes/kubernetes/tree/5a0c22e09ab7695727b9c1be062f39e346960e9f/examples/volumes/vsphere)
+
+#### Configuration and deployment
+
+When writing custom deployment scripts the following needs to be done to be able to use the vSphere Cloud Provider. 
+
+* Enable UUID for a VM
+
+This can be done via [govc tool](https://github.com/vmware/govmomi/tree/master/govc)
+
+```
+export GOVC_URL=<IP/URL>
+export GOVC_USERNAME=<vCenter User>
+export GOVC_PASSWORD=<vCenter Password>
+export GOVC_INSECURE=1
+govc vm.change -e="disk.enableUUID=1" -vm=<VMNAME>
+```
+
+* Provide the cloud config on each node to kubelet, apiserver and controller manager via ```--cloud-config=<path to file>```. Cloud config [template can be found at kubernetes-anywhere] (https://github.com/kubernetes/kubernetes-anywhere/blob/master/phase1/vsphere/vsphere.conf)
+* Set the cloud provider via ```--cloud-provider=vsphere``` flag for kubelet, apiserver and controller manager. 
+
+
+#### Known issues
+
+* [Volumes are not removed from a VM configuration if the VM is down](https://github.com/kubernetes/kubernetes/issues/33061). The workaround is to manually remove the disk from VM settings before powering it up.
+* [FS groups are not supported in 1.4.7](https://github.com/kubernetes/kubernetes/issues/34039)
+
+### Kube-up (Deprecated)
+
+Kube-up.sh is no longer supported and is deprecated. The steps for kube-up are included but going forward [kube-anywhere](https://github.com/kubernetes/kubernetes-anywhere) is preferred. 
+
+The recommended version for kube-up is [v1.4.7](https://github.com/kubernetes/kubernetes/releases/tag/v1.4.7)
+
+The example below creates a Kubernetes cluster with 4 worker node Virtual.
+Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This cluster is set up and controlled from your workstation (or wherever you find convenient).
+
+#### Prerequisites
+
+* You need administrator credentials to an ESXi machine or vCenter instance with write mode api access enabled (not available on the free ESXi license).
+* You must have Go (see [here](https://github.com/kubernetes/kubernetes/tree/{{page.githubbranch}}/docs/devel/development.md#go-versions) for supported versions) installed: [www.golang.org](http://www.golang.org).
+* You must have your `GOPATH` set up and include `$GOPATH/bin` in your `PATH`.
 
 ```shell
 export GOPATH=$HOME/src/go
@@ -25,7 +73,7 @@ mkdir -p $GOPATH
 export PATH=$PATH:$GOPATH/bin
 ```
 
-4. Install the govc tool to interact with ESXi/vCenter. Head to [govc Releases](https://github.com/vmware/govmomi/releases) to download the latest.
+* Install the govc tool to interact with ESXi/vCenter. Head to [govc Releases](https://github.com/vmware/govmomi/releases) to download the latest.
 
 ```shell
 # Sample commands for v0.8.0 for 64 bit Linux.
@@ -35,9 +83,9 @@ chmod +x govc_linux_amd64
 mv govc_linux_amd64 /usr/local/bin/govc
 ```
 
-5. Get or build a [binary release](/docs/getting-started-guides/binary_release)
+* Get or build a [binary release](/docs/getting-started-guides/binary_release)
 
-### Setup
+#### Setup
 
 Download a prebuilt Debian 8.2 VMDK that we'll use as a base image:
 
@@ -100,19 +148,19 @@ make any needed changes. You can configure the number of nodes
 as well as the IP subnets you have made available to Kubernetes, pods,
 and services.
 
-### Starting a cluster
+#### Starting a cluster
 
 Now, let's continue with deploying Kubernetes.
 This process takes about ~20-30 minutes depending on your network.
 
-#### From extracted binary release
+##### From extracted binary release
 
 ```shell
 cd kubernetes
 KUBERNETES_PROVIDER=vsphere cluster/kube-up.sh
 ```
 
-#### Build from source
+##### Build from source
 
 ```shell
 cd kubernetes
@@ -126,7 +174,7 @@ deployment works just as any other one!
 
 **Enjoy!**
 
-### Extra: debugging deployment failure
+#### Extra: debugging deployment failure
 
 The output of `kube-up.sh` displays the IP addresses of the VMs it deploys. You
 can log into any VM as the `kube` user to poke around and figure out what is
@@ -138,7 +186,7 @@ going on (find yourself authorized with your SSH key, or use the password
 
 IaaS Provider        | Config. Mgmt | OS     | Networking  | Docs                                              | Conforms | Support Level
 -------------------- | ------------ | ------ | ----------  | ---------------------------------------------     | ---------| ----------------------------
-Vmware vSphere       | Saltstack    | Debian | OVS         | [docs](/docs/getting-started-guides/vsphere)                                |          | Community ([@imkin](https://github.com/imkin)), ([@abrarshivani](https://github.com/abrarshivani)), ([@kerneltime](https://github.com/kerneltime)), ([@kerneltime](https://github.com/luomiao))
+Vmware vSphere       | Kube-anywhere    | Photon OS | Flannel         | [docs](/docs/getting-started-guides/vsphere)                                |          | Community  ([@abrarshivani](https://github.com/abrarshivani)), ([@kerneltime](https://github.com/kerneltime)), ([@BaluDontu](https://github.com/BaluDontu))([@luomiao](https://github.com/luomiao))
 
 For support level information on all solutions, see the [Table of solutions](/docs/getting-started-guides/#table-of-solutions) chart.
 
